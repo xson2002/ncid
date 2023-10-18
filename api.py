@@ -93,6 +93,9 @@ async def evaluate_single_line_ciphertext(ciphertext: str, architecture: List[st
         config.FEATURE_ENGINEERING = feature_engineering
         config.PAD_INPUT = pad_input
     else:
+        if len(set(architecture)) != len(architecture):
+            return JSONResponse({"success": False, "payload": None, "error_msg": "Multiple architectures of the same type are not "
+                                                                                 "allowed!"}, status_code=status.HTTP_400_BAD_REQUEST)
         cipher_indices = []
         for cipher_type in cipher_types:
             cipher_indices.append(config.CIPHER_TYPES.index(cipher_type))
@@ -102,9 +105,6 @@ async def evaluate_single_line_ciphertext(ciphertext: str, architecture: List[st
             if val not in models.keys():
                 return JSONResponse({"success": False, "payload": None, "error_msg": "The architecture '%s' does not exist!" % val},
                                     status_code=status.HTTP_400_BAD_REQUEST)
-            if len(set(models.keys())) != len(models.keys()):
-                return JSONResponse({"success": False, "payload": None, "error_msg": "Multiple architectures of the same type are not "
-                                                                                     "allowed!"}, status_code=status.HTTP_400_BAD_REQUEST)
             model_list.append(models[val][0])
             architecture_list.append(val)
         cipherEval.architecture = "Ensemble"
