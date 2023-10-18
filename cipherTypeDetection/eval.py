@@ -349,7 +349,7 @@ def predict_single_line(args_, model_):
 
     # return a list of probabilities (does only return the last one in case a file is used)
     res_dict = {}
-    if result:
+    if len(result) != 0:
         for j, val in enumerate(result[0]):
             res_dict[args_.ciphers[j]] = val * 100
     return res_dict
