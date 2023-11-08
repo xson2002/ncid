@@ -1,16 +1,14 @@
-import tensorflow as tf
-import cipherTypeDetection.config as config
 from cipherImplementations.cipher import OUTPUT_ALPHABET
-from cipherImplementations.simpleSubstitution import SimpleSubstitution
-import sys
-from util.utils import map_text_into_numberspace
-import copy
+import cipherTypeDetection.config as config
 import math
-import multiprocessing
-import numpy as np
+from collections import Counter
 from py_mini_racer import py_mini_racer
-sys.path.append("../")
+import numpy as np
+import time
 
+from itertools import chain
+
+from util.utils import map_text_into_numberspace
 
 js_functions = """var max_period = 15;
 
@@ -809,6 +807,15 @@ def calculate_index_of_coincidence(text):
         coindex = coindex + n[i] * (n[i] - 1) / len(text) / (len(text) - 1)
     return coindex
 
+def ioc_26_letters(text):
+    n = [0]*26
+    for p in text:
+        if p < 26:
+            n[p] = n[p] + 1
+    coindex = 0
+    for i in range(0, 26):
+        coindex = coindex + n[i] * (n[i] - 1) / len(text) / (len(text) - 1)
+    return coindex
 
 def calculate_digraphic_index_of_coincidence(text):
     pair_number = len(OUTPUT_ALPHABET) * len(OUTPUT_ALPHABET)
@@ -874,7 +881,7 @@ def pattern_repetitions(text):
     if length > 1:
         rep += length
     if counter != 0:
-        return rep / counter
+        return rep / counter / 10
     return 0
 
 
@@ -898,6 +905,7 @@ def calculate_autocorrelation(text):
     :param text: input numbers-ciphertext
     :return: autocorrelation average"""
     # https://stackoverflow.com/questions/14297012/estimate-autocorrelation-using-python
+    text = np.array(text)
     n = len(text)
     variance = text.var()
     text = text - text.mean()
@@ -919,7 +927,8 @@ def calculate_maximum_index_of_coincidence(text):
             txt = []
             for k in range(j, len(text), i):
                 txt.append(text[k])
-            avg += calculate_index_of_coincidence(txt)
+            if len(txt) > 1:
+                avg += calculate_index_of_coincidence(txt)
         iocs.append(avg / i)
     return max(iocs)
 
@@ -1123,7 +1132,9 @@ def calculate_phic(text):
         if y > 1:
             z += x / (y * (y - 1))
     z /= (period-2)
-    return z*10
+    # Divide the result by 100 for scaling. Input lines above 100 chars seem to
+    # increase the value above 1.0.
+    return z*10 / 100
 
 
 def calculate_bdi(text):
@@ -1153,7 +1164,9 @@ def calculate_bdi(text):
             sum_ += freq[i] * (freq[i] - 1)
         score = 100*normalizer * sum_ // (numb*(numb-1)) / 1000
         best_score = max(best_score, score)
-    return best_score
+    # Divide best_score by 100 for scaling. Input lines above 100 chars seem to
+    # increase the value above 1.0.
+    return best_score / 100
 
 
 def calculate_cdd(text):
@@ -1173,94 +1186,354 @@ def calculate_sstd(text):
         return 0
     return ctx.call("get_sstd", text)
 
+def digrams():
+    """Returns a list of all possible digrams for the numbers 0 to 25."""
+    return [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [0, 6], [0, 7], [0, 8], [0, 9], [0, 10], [0, 11], [0, 12], [0, 13], [0, 14], [0, 15], [0, 16], [0, 17], [0, 18], [0, 19], [0, 20], [0, 21], [0, 22], [0, 23], [0, 24], [0, 25], [1, 0], [1, 1], [1, 2], [1, 3], [1, 4], [1, 5], [1, 6], [1, 7], [1, 8], [1, 9], [1, 10], [1, 11], [1, 12], [1, 13], [1, 14], [1, 15], [1, 16], [1, 17], [1, 18], [1, 19], [1, 20], [1, 21], [1, 22], [1, 23], [1, 24], [1, 25], [2, 0], [2, 1], [2, 2], [2, 3], [2, 4], [2, 5], [2, 6], [2, 7], [2, 8], [2, 9], [2, 10], [2, 11], [2, 12], [2, 13], [2, 14], [2, 15], [2, 16], [2, 17], [2, 18], [2, 19], [2, 20], [2, 21], [2, 22], [2, 23], [2, 24], [2, 25], [3, 0], [3, 1], [3, 2], [3, 3], [3, 4], [3, 5], [3, 6], [3, 7], [3, 8], [3, 9], [3, 10], [3, 11], [3, 12], [3, 13], [3, 14], [3, 15], [3, 16], [3, 17], [3, 18], [3, 19], [3, 20], [3, 21], [3, 22], [3, 23], [3, 24], [3, 25], [4, 0], [4, 1], [4, 2], [4, 3], [4, 4], [4, 5], [4, 6], [4, 7], [4, 8], [4, 9], [4, 10], [4, 11], [4, 12], [4, 13], [4, 14], [4, 15], [4, 16], [4, 17], [4, 18], [4, 19], [4, 20], [4, 21], [4, 22], [4, 23], [4, 24], [4, 25], [5, 0], [5, 1], [5, 2], [5, 3], [5, 4], [5, 5], [5, 6], [5, 7], [5, 8], [5, 9], [5, 10], [5, 11], [5, 12], [5, 13], [5, 14], [5, 15], [5, 16], [5, 17], [5, 18], [5, 19], [5, 20], [5, 21], [5, 22], [5, 23], [5, 24], [5, 25], [6, 0], [6, 1], [6, 2], [6, 3], [6, 4], [6, 5], [6, 6], [6, 7], [6, 8], [6, 9], [6, 10], [6, 11], [6, 12], [6, 13], [6, 14], [6, 15], [6, 16], [6, 17], [6, 18], [6, 19], [6, 20], [6, 21], [6, 22], [6, 23], [6, 24], [6, 25], [7, 0], [7, 1], [7, 2], [7, 3], [7, 4], [7, 5], [7, 6], [7, 7], [7, 8], [7, 9], [7, 10], [7, 11], [7, 12], [7, 13], [7, 14], [7, 15], [7, 16], [7, 17], [7, 18], [7, 19], [7, 20], [7, 21], [7, 22], [7, 23], [7, 24], [7, 25], [8, 0], [8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 6], [8, 7], [8, 8], [8, 9], [8, 10], [8, 11], [8, 12], [8, 13], [8, 14], [8, 15], [8, 16], [8, 17], [8, 18], [8, 19], [8, 20], [8, 21], [8, 22], [8, 23], [8, 24], [8, 25], [9, 0], [9, 1], [9, 2], [9, 3], [9, 4], [9, 5], [9, 6], [9, 7], [9, 8], [9, 9], [9, 10], [9, 11], [9, 12], [9, 13], [9, 14], [9, 15], [9, 16], [9, 17], [9, 18], [9, 19], [9, 20], [9, 21], [9, 22], [9, 23], [9, 24], [9, 25], [10, 0], [10, 1], [10, 2], [10, 3], [10, 4], [10, 5], [10, 6], [10, 7], [10, 8], [10, 9], [10, 10], [10, 11], [10, 12], [10, 13], [10, 14], [10, 15], [10, 16], [10, 17], [10, 18], [10, 19], [10, 20], [10, 21], [10, 22], [10, 23], [10, 24], [10, 25], [11, 0], [11, 1], [11, 2], [11, 3], [11, 4], [11, 5], [11, 6], [11, 7], [11, 8], [11, 9], [11, 10], [11, 11], [11, 12], [11, 13], [11, 14], [11, 15], [11, 16], [11, 17], [11, 18], [11, 19], [11, 20], [11, 21], [11, 22], [11, 23], [11, 24], [11, 25], [12, 0], [12, 1], [12, 2], [12, 3], [12, 4], [12, 5], [12, 6], [12, 7], [12, 8], [12, 9], [12, 10], [12, 11], [12, 12], [12, 13], [12, 14], [12, 15], [12, 16], [12, 17], [12, 18], [12, 19], [12, 20], [12, 21], [12, 22], [12, 23], [12, 24], [12, 25], [13, 0], [13, 1], [13, 2], [13, 3], [13, 4], [13, 5], [13, 6], [13, 7], [13, 8], [13, 9], [13, 10], [13, 11], [13, 12], [13, 13], [13, 14], [13, 15], [13, 16], [13, 17], [13, 18], [13, 19], [13, 20], [13, 21], [13, 22], [13, 23], [13, 24], [13, 25], [14, 0], [14, 1], [14, 2], [14, 3], [14, 4], [14, 5], [14, 6], [14, 7], [14, 8], [14, 9], [14, 10], [14, 11], [14, 12], [14, 13], [14, 14], [14, 15], [14, 16], [14, 17], [14, 18], [14, 19], [14, 20], [14, 21], [14, 22], [14, 23], [14, 24], [14, 25], [15, 0], [15, 1], [15, 2], [15, 3], [15, 4], [15, 5], [15, 6], [15, 7], [15, 8], [15, 9], [15, 10], [15, 11], [15, 12], [15, 13], [15, 14], [15, 15], [15, 16], [15, 17], [15, 18], [15, 19], [15, 20], [15, 21], [15, 22], [15, 23], [15, 24], [15, 25], [16, 0], [16, 1], [16, 2], [16, 3], [16, 4], [16, 5], [16, 6], [16, 7], [16, 8], [16, 9], [16, 10], [16, 11], [16, 12], [16, 13], [16, 14], [16, 15], [16, 16], [16, 17], [16, 18], [16, 19], [16, 20], [16, 21], [16, 22], [16, 23], [16, 24], [16, 25], [17, 0], [17, 1], [17, 2], [17, 3], [17, 4], [17, 5], [17, 6], [17, 7], [17, 8], [17, 9], [17, 10], [17, 11], [17, 12], [17, 13], [17, 14], [17, 15], [17, 16], [17, 17], [17, 18], [17, 19], [17, 20], [17, 21], [17, 22], [17, 23], [17, 24], [17, 25], [18, 0], [18, 1], [18, 2], [18, 3], [18, 4], [18, 5], [18, 6], [18, 7], [18, 8], [18, 9], [18, 10], [18, 11], [18, 12], [18, 13], [18, 14], [18, 15], [18, 16], [18, 17], [18, 18], [18, 19], [18, 20], [18, 21], [18, 22], [18, 23], [18, 24], [18, 25], [19, 0], [19, 1], [19, 2], [19, 3], [19, 4], [19, 5], [19, 6], [19, 7], [19, 8], [19, 9], [19, 10], [19, 11], [19, 12], [19, 13], [19, 14], [19, 15], [19, 16], [19, 17], [19, 18], [19, 19], [19, 20], [19, 21], [19, 22], [19, 23], [19, 24], [19, 25], [20, 0], [20, 1], [20, 2], [20, 3], [20, 4], [20, 5], [20, 6], [20, 7], [20, 8], [20, 9], [20, 10], [20, 11], [20, 12], [20, 13], [20, 14], [20, 15], [20, 16], [20, 17], [20, 18], [20, 19], [20, 20], [20, 21], [20, 22], [20, 23], [20, 24], [20, 25], [21, 0], [21, 1], [21, 2], [21, 3], [21, 4], [21, 5], [21, 6], [21, 7], [21, 8], [21, 9], [21, 10], [21, 11], [21, 12], [21, 13], [21, 14], [21, 15], [21, 16], [21, 17], [21, 18], [21, 19], [21, 20], [21, 21], [21, 22], [21, 23], [21, 24], [21, 25], [22, 0], [22, 1], [22, 2], [22, 3], [22, 4], [22, 5], [22, 6], [22, 7], [22, 8], [22, 9], [22, 10], [22, 11], [22, 12], [22, 13], [22, 14], [22, 15], [22, 16], [22, 17], [22, 18], [22, 19], [22, 20], [22, 21], [22, 22], [22, 23], [22, 24], [22, 25], [23, 0], [23, 1], [23, 2], [23, 3], [23, 4], [23, 5], [23, 6], [23, 7], [23, 8], [23, 9], [23, 10], [23, 11], [23, 12], [23, 13], [23, 14], [23, 15], [23, 16], [23, 17], [23, 18], [23, 19], [23, 20], [23, 21], [23, 22], [23, 23], [23, 24], [23, 25], [24, 0], [24, 1], [24, 2], [24, 3], [24, 4], [24, 5], [24, 6], [24, 7], [24, 8], [24, 9], [24, 10], [24, 11], [24, 12], [24, 13], [24, 14], [24, 15], [24, 16], [24, 17], [24, 18], [24, 19], [24, 20], [24, 21], [24, 22], [24, 23], [24, 24], [24, 25], [25, 0], [25, 1], [25, 2], [25, 3], [25, 4], [25, 5], [25, 6], [25, 7], [25, 8], [25, 9], [25, 10], [25, 11], [25, 12], [25, 13], [25, 14], [25, 15], [25, 16], [25, 17], [25, 18], [25, 19], [25, 20], [25, 21], [25, 22], [25, 23], [25, 24], [25, 25]]
 
-def encrypt(plaintext, label, key_length, keep_unknown_symbols, return_key=False):
-    cipher = config.CIPHER_IMPLEMENTATIONS[label]
-    plaintext = cipher.filter(plaintext, keep_unknown_symbols)
-    key = cipher.generate_random_key(key_length)
-    if return_key:
-        orig_key = copy.deepcopy(key)
-    plaintext_numberspace = map_text_into_numberspace(plaintext, cipher.alphabet, cipher.unknown_symbol_number)
-    if isinstance(key, bytes):
-        key = map_text_into_numberspace(key, cipher.alphabet, cipher.unknown_symbol_number)
-    elif isinstance(key, list) and len(key) == 2 and isinstance(key[0], bytes) and isinstance(key[1], bytes):
-        key[0] = map_text_into_numberspace(key[0], cipher.alphabet, cipher.unknown_symbol_number)
-        key[1] = map_text_into_numberspace(key[1], cipher.alphabet, cipher.unknown_symbol_number)
-    elif isinstance(key, list) and len(key) == 3 and isinstance(key[0], bytes) and isinstance(key[1], bytes) and isinstance(key[2], bytes):
-        key[0] = map_text_into_numberspace(key[0], cipher.alphabet, cipher.unknown_symbol_number)
-        key[1] = map_text_into_numberspace(key[1], cipher.alphabet, cipher.unknown_symbol_number)
-        key[2] = map_text_into_numberspace(key[2], cipher.alphabet, cipher.unknown_symbol_number)
-    elif isinstance(key, list) and len(key) == 2 and isinstance(key[0], bytes) and isinstance(key[1], int):
-        key[0] = map_text_into_numberspace(key[0], cipher.alphabet, cipher.unknown_symbol_number)
-    elif isinstance(key, list) and len(key) == 3 and isinstance(key[0], int) and isinstance(key[1], bytes) and isinstance(key[2], bytes):
-        key[1] = map_text_into_numberspace(key[1], cipher.alphabet, cipher.unknown_symbol_number)
-        key[2] = map_text_into_numberspace(key[2], cipher.alphabet, cipher.unknown_symbol_number)
-    elif isinstance(key, list) and len(key) == 2 and isinstance(key[0], (list, np.ndarray)) and (len(key[0]) == 5 or len(
-            key[0]) == 10) and isinstance(key[1], bytes):
-        key[1] = map_text_into_numberspace(key[1], cipher.alphabet, cipher.unknown_symbol_number)
-    elif isinstance(key, list) and len(key) == 3 and isinstance(key[0], list) and isinstance(key[1], np.ndarray) and isinstance(
-            key[2], bytes):
-        key[2] = map_text_into_numberspace(key[2], cipher.alphabet, cipher.unknown_symbol_number)
-    elif isinstance(key, dict):
-        new_key_dict = {}
-        for k in key:
-            new_key_dict[cipher.alphabet.index(k)] = key[k]
-        key = new_key_dict
+class Digram:
+    def __init__(self, left, right):
+        self.left = int(left)
+        self.right = int(right)
 
-    ciphertext = cipher.encrypt(plaintext_numberspace, key)
-    if b'j' not in cipher.alphabet and config.CIPHER_TYPES[label] != 'homophonic':
-        ciphertext = normalize_text(ciphertext, 9)
-    if b'x' not in cipher.alphabet:
-        ciphertext = normalize_text(ciphertext, 23)
-    if return_key:
-        return ciphertext, orig_key
-    return ciphertext
+    def list(self):
+        return [self.left, self.right]
+
+    def __hash__(self):
+        return self.left ^ self.right
+    
+    def __eq__(self, other):
+        return isinstance(other, Digram) and other.left == self.left and other.right == self.right
+    
+    def __lt__(self, other):
+        if not isinstance(other, Digram):
+            raise Exception(f"Cannot compare object of type Digram to {type(other)}")
+        first_comparison = self.left - other.left
+        if first_comparison == 0:
+            return self.right - other.right < 0
+        else:
+            return first_comparison < 0
+    
+    def __str__(self):
+        return f"[{self.left}, {self.right}]"
+    
+    def __repr__(self) -> str:
+        return f"Digram: [{self.left}, {self.right}]"
+
+def calculate_histogram(line):
+    """Calculate the occurrences of each letter in line. The input has to be a ciphertext
+    as an array of numbers (where each number corresponds to the letter in the alphabet). 
+    The occurrances of each number (of the expected alphabet) are counted, scaled and returned. 
+    """
+    alphabet = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+    letter_count = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 22: 0, 23: 0, 24: 0, 25: 0}
+
+    for letter in line:
+        if letter in alphabet:
+            letter_count[letter] += 1
+
+    max_letter_count = max(letter_count.values())
+    sorted_items = sorted(letter_count.items())
+
+    return [item[1] / len(line) for item in sorted_items]
+
+def calculate_digrams(line):
+    """Calculates the count of digrams in line. Line is expected to be a list of numbers.
+    The counts for the digrams are returned as a list of the scaled counts per digram.
+    """
+    all_digram_counts = { digram: 0.0 for digram in [Digram(d[0], d[1]) for d in digrams()] }
+
+    digrams_of_line = list(map(lambda t: Digram(t[0], t[1]), zip(line, line[1:])))
+    counted_digrams = Counter(digrams_of_line)
+
+    for digram, count in counted_digrams.items():
+        if digram in all_digram_counts:
+            all_digram_counts[digram] = count
+
+    max_digram_count = max(all_digram_counts.values())
+    sorted_items = list(sorted(all_digram_counts.items()))
+
+    return [item[1] / len(line) for item in sorted_items]
+
+def digram_counts(line):
+    all_digram_counts = { digram: 0.0 for digram in [Digram(d[0], d[1]) for d in digrams()] }
+
+    digrams_of_line = list(map(lambda t: Digram(t[0], t[1]), zip(line, line[1:])))
+    counted_digrams = Counter(digrams_of_line)
+
+    for digram, count in counted_digrams.items():
+        if digram in all_digram_counts:
+            all_digram_counts[digram] = count
+
+    two_digram = [c for c in all_digram_counts.values() if c == 2]
+    three_digram = [c for c in all_digram_counts.values() if c == 3]
+    four_digram = [c for c in all_digram_counts.values() if c == 4]
+
+    return [len(two_digram), len(three_digram), len(four_digram)]
+ 
+def calculate_cipher_sequence(line):
+    """Returns characters of the input line (truncated to max 100 chars) in the order they
+    appear in `line`. Each character is scaled by dividing by the largest possible value.
+    Line is expected to be a list of numbers (mapping to the defined alphabet).
+    Unknown mappings are converted to `config.UNKNOWN_SYMBOL_NUMBER`."""
+    feature_length = 500
+    result = []
+
+    # ensure that the length of `line` matches `feature_length`
+    while len(line) < feature_length:
+        line = np.concatenate((line, line))
+    line = line[:feature_length]
+
+    for char in line:
+        if 0 <= char < 26:
+            result.append(char)
+        else:
+            result.append(config.UNKNOWN_SYMBOL_NUMBER)
+
+    missing = feature_length - len(result)
+    for i in range(missing):
+        result.append(config.UNKNOWN_SYMBOL_NUMBER)
+
+    # Divide by `config.UNKNOWN_SYMBOL_NUMBER` which is the max character mapping
+    return [character / config.UNKNOWN_SYMBOL_NUMBER for character in result]
+
+def calculate_average_distance(line):
+    """Calculates the average distances between the occurances of the same letter. Divides the result by the line length. Returns an array of 26 entries."""
+    alphabet = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+    letter_indices = {0: -1, 1: -1, 2: -1, 3: -1, 4: -1, 5: -1, 6: -1, 7: -1, 8: -1, 9: -1, 10: -1, 11: -1, 12: -1, 13: -1, 14: -1, 15: -1, 16: -1, 17: -1, 18: -1, 19: -1, 20: -1, 21: -1, 22: -1, 23: -1, 24: -1, 25: -1}
+    letter_distances = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 22: 0, 23: 0, 24: 0, 25: 0}
+    letter_occurrances = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 22: 0, 23: 0, 24: 0, 25: 0}
+
+    for index, letter in enumerate(line):
+        if not letter in alphabet:
+            continue
+        letter_occurrances[letter] += 1
+        previous_index = letter_indices[letter]
+        letter_indices[letter] = index
+        if previous_index == -1:
+            continue
+        distance = index - previous_index
+        letter_distances[letter] += distance
+
+    result = []
+    for letter in alphabet:
+        if letter_occurrances[letter] <= 1:
+            result.append(0)
+        else:
+            result.append(letter_distances[letter] / (letter_occurrances[letter] - 1) / len(line))
+
+    return result
 
 
-def normalize_text(text, pos):
-    for i in range(len(text)):
-        if 26 >= text[i] >= pos:
-            text[i] += 1
-    return text
+def calculate_longest_distance(line):
+    """Calculates the longest distances between the occurances of the same letter. Divides the result by the line length. Returns an array of 26 entries."""
+    alphabet = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+    letter_indices = {0: -1, 1: -1, 2: -1, 3: -1, 4: -1, 5: -1, 6: -1, 7: -1, 8: -1, 9: -1, 10: -1, 11: -1, 12: -1, 13: -1, 14: -1, 15: -1, 16: -1, 17: -1, 18: -1, 19: -1, 20: -1, 21: -1, 22: -1, 23: -1, 24: -1, 25: -1}
+    letter_distances = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 22: 0, 23: 0, 24: 0, 25: 0}
 
+    for index, letter in enumerate(line):
+        if not letter in alphabet:
+            continue
+        previous_index = letter_indices[letter]
+        letter_indices[letter] = index
+        if previous_index == -1:
+            continue
+        distance = index - previous_index
+        if distance > letter_distances[letter]:
+            letter_distances[letter] = distance
+
+    result = []
+    for letter in alphabet:
+        result.append(letter_distances[letter] / len(line))
+
+    return result
+
+def calculate_meta_histogram_features(line):
+    histogram = np.array(calculate_histogram(line))
+    return meta_features(histogram)
+
+def meta_features(feature):
+    mean = np.mean(feature)
+    max = np.max(feature)
+    min = np.min(feature)
+    var = np.var(feature)
+    percentile_90 = np.percentile(feature, 90)
+    percentile_10 = np.percentile(feature, 10)
+    def samples_near_mean(mean):
+        above_mean = mean + mean * 0.1
+        below_mean = mean - mean * 0.1
+        return len(feature[np.logical_and(feature > below_mean, feature < above_mean)]) / len(feature)
+    def samples_near_90_percentile(percentile):
+        above_percentile = percentile + percentile * 0.1
+        below_percentile = percentile - percentile * 0.1
+        return len(feature[np.logical_and(feature > below_percentile, feature < above_percentile)]) / len(feature)
+    def samples_near_10_percentile(percentile):
+        above_percentile = percentile + percentile * 0.1
+        below_percentile = percentile - percentile * 0.1
+        return len(feature[np.logical_and(feature > below_percentile, feature < above_percentile)]) / len(feature)
+    return [mean, max, min, var, percentile_90, percentile_10, samples_near_mean(mean), samples_near_90_percentile(percentile_90), samples_near_10_percentile(percentile_10)]
+
+def purple_features(line):
+    hist = np.array(calculate_histogram(line))
+    sorted_hist = sorted(hist)
+    top_6 = sorted_hist[-5:]
+    top_6_mean = np.mean(top_6)
+    top_6_var = np.var(top_6)
+    overall = hist[5:-5]
+    overall_mean = np.mean(overall)
+    overall_var = np.var(overall)
+    bottom_6 = sorted_hist[:5]
+    bottom_6_mean = np.mean(bottom_6)
+
+    gradient_top_6 = max(top_6) - min(top_6)
+    gradient_overall = max(overall) - min(overall)
+    gradient_bottom_6 = max(bottom_6) - min(bottom_6)
+
+    digrams = np.array(calculate_digrams(line))
+    overall_digrams = digrams[200:-10]
+    overall_digram_mean = np.mean(overall_digrams)
+    sorted_digrams = sorted(digrams)
+    top_10_digrams = sorted_digrams[-10:]
+    top_10_digrams_mean = np.mean(top_10_digrams)
+    next_10_digrams = sorted_digrams[-20:-10]
+    next_10_digrams_mean = np.mean(next_10_digrams)
+    bottom_200_digrams = sorted_digrams[:200]
+    bottom_200_digrams_mean = np.mean(bottom_200_digrams)
+
+    return [
+        top_6_mean - overall_mean, 
+        overall_mean, 
+        overall_mean - bottom_6_mean,
+
+        top_6_var,
+        overall_var,
+
+        gradient_top_6,
+        gradient_overall,
+        gradient_bottom_6,
+
+        top_10_digrams_mean - overall_digram_mean, 
+        next_10_digrams_mean - overall_digram_mean,
+        overall_digram_mean - bottom_200_digrams_mean
+    ]
+
+def period_ioc_test(line):
+    """Based upon: https://www.staff.uni-mainz.de/pommeren/Cryptology/Classic/3_Coincid/Phibar.html"""
+    feature_length = 1000
+    while len(line) < feature_length:
+        line = np.concatenate((line, line))
+    line = line[:feature_length]
+    max_period = len(line) // 15
+    
+    results = []
+    for period in range(2, max_period):
+        columns = [[] for __ in range(period)]
+        iocs = []
+        for i, c in enumerate(line):
+            columns[i % period].append(c)
+        for column in columns:
+            ioc = ioc_26_letters(column)
+            iocs.append(ioc)
+        
+        mean = 0
+        for i in range(period):
+            mean += iocs[i]
+        mean = mean / period
+        results.append(mean)
+
+    return results
+
+def calculate_rotor_statistics(datum):
+    """
+    These features are used to train the rotor-only SVM classifier. 
+    They have shown to be most useful while classifing those ciphers.
+    """
+    line = [int(d) for d in datum]
+
+    frequencies = calculate_frequencies(line, 1, recursive=False)[0:26]
+    chi_square = calculate_chi_square(frequencies)
+    entropy = calculate_entropy(line)
+    mic = calculate_maximum_index_of_coincidence(line)
+    mka = calculate_max_kappa(line)
+    ldi = calculate_log_digraph_score(line)
+    rdi = calculate_reverse_log_digraph_score(line)
+    unigram_ioc = calculate_index_of_coincidence(line)
+    digraphic_ioc = calculate_digraphic_index_of_coincidence(line)
+    
+    average_distance = calculate_average_distance(line)
+    longest_distance = calculate_longest_distance(line)
+
+    meta_hist = calculate_meta_histogram_features(line)
+
+    return (
+        [chi_square, entropy, mic, mka, ldi, rdi, unigram_ioc, digraphic_ioc] 
+        + average_distance 
+        + longest_distance 
+        + meta_hist
+        + purple_features(line) 
+        + period_ioc_test(line)
+    )
 
 def calculate_statistics(datum):
+    """
+    Calculates features for the classification of all cipher types.
+    """
     numbers = [int(d) for d in datum]
+
     unigram_ioc = calculate_index_of_coincidence(numbers)
     digraphic_ioc = calculate_digraphic_index_of_coincidence(numbers)
     # autocorrelation = calculate_autocorrelation(datum)
-    frequencies = calculate_frequencies(numbers, 2, recursive=True)
+    frequencies = calculate_frequencies(numbers, 1, recursive=True) # 1482 # new: 38
 
     has_j = has_letter_j(numbers)
-    # chi_square = calculate_chi_square(frequencies[0:26])
-    # rep = pattern_repetitions(numbers)
-    # entropy = calculate_entropy(numbers)
+    chi_square = calculate_chi_square(frequencies[0:26])
+    rep = pattern_repetitions(numbers)
+    entropy = calculate_entropy(numbers)
     has_h = has_hash(numbers)
     has_sp = has_space(numbers)
     has_x = has_letter_x(numbers)
     has_0 = has_digit_0(numbers)
     mic = calculate_maximum_index_of_coincidence(numbers)
     mka = calculate_max_kappa(numbers)
-    # edi = calculate_digraphic_index_of_coincidence_even(numbers)
+    edi = calculate_digraphic_index_of_coincidence_even(numbers)
     ldi = calculate_log_digraph_score(numbers)
-    # rdi = calculate_reverse_log_digraph_score(numbers)
-    rod, lr = calculate_rod_lr(numbers)
+    rdi = calculate_reverse_log_digraph_score(numbers)
+    # TODO: Takes too long!
+    # rod, lr = calculate_rod_lr(numbers) # 1, 1
     nomor = calculate_normal_order(frequencies[0:26])
-    # dbl = is_dbl(numbers)
+    dbl = is_dbl(numbers)
     nic = calculate_nic(numbers)
     sdd = calculate_sdd(numbers)
     ptx = calculate_ptx(numbers)
     phic = calculate_phic(datum)
     bdi = calculate_bdi(numbers)
-    # cdd = calculate_cdd(numbers)
-    # sstd = calculate_sstd(numbers)
-    ldi_stats = calculate_ldi_stats(numbers)
+    cdd = calculate_cdd(numbers)
+    sstd = calculate_sstd(numbers)
+    # TODO: Takes too long!
+    # ldi_stats = calculate_ldi_stats(numbers) # 5
+
+    histogram = calculate_histogram(numbers)
+    cipher_sequence = calculate_cipher_sequence(numbers)
+    average_distance = calculate_average_distance(numbers)
+    longest_distance = calculate_longest_distance(numbers)
+    meta_hist = calculate_meta_histogram_features(numbers)
+    purple = purple_features(numbers)
+    periodic_ioc = period_ioc_test(numbers)
 
     # baseline model
     # return [unigram_ioc] + [digraphic_ioc] + [has_j] + [entropy] + [chi_square] + [has_h] + [has_sp] + [has_x] + frequencies
 
-    return [unigram_ioc] + [digraphic_ioc] + frequencies + [has_0] + [has_h] + [has_j] + [has_x] + [has_sp] + [rod] + [lr] + [sdd] +\
-           [ldi] + [nomor] + [phic] + [bdi] + [ptx] + [nic] + [mka] + [mic] + ldi_stats
+
+    return ([chi_square] + [rep] + [entropy] + [edi] + [rdi] + [dbl] 
+            + [cdd] + [sstd]
+            + [unigram_ioc] + [digraphic_ioc] + frequencies + [has_0] 
+            + [has_h] + [has_j] + [has_x] + [has_sp] + [sdd] + [ldi] 
+            + [nomor] + [phic] + [bdi] + [ptx] + [nic] + [mka] + [mic] 
+            + average_distance + longest_distance + meta_hist
+            + purple
+            + periodic_ioc
+            + histogram
+            + cipher_sequence
+    )
 
     # all features
     # return [unigram_ioc] + [digraphic_ioc] + [has_j] + [entropy] + [chi_square] + [has_h] + [has_sp] + [has_x] + [has_0] + [mic] +\
@@ -1271,124 +1544,3 @@ def calculate_statistics(datum):
     # return [unigram_ioc] + [digraphic_ioc] + [has_j] + [entropy] + [chi_square] + [has_h] + [has_sp] + [has_x] + [has_0] +\
     #        [rep] + [edi] + [ldi] + [rdi] + [rod] + [lr] + [nomor] + [dbl] + [nic] + [sdd] + [ptx] + [phic] + [bdi] +\
     #        [sstd] + autocorrelation + frequencies
-
-
-def pad_sequences(sequences, maxlen):
-    """Pad sequences with data from itself."""
-    ret_sequences = []
-    for sequence in sequences:
-        length = len(sequence)
-        sequence = sequence * (maxlen // length) + sequence[:maxlen % length]
-        ret_sequences.append(sequence)
-    return np.array(ret_sequences)
-
-
-class TextLine2CipherStatisticsDataset:
-    def __init__(self, paths, cipher_types, batch_size, min_text_len, max_text_len, keep_unknown_symbols=False, dataset_workers=None,
-                 generate_test_data=False):
-        self.keep_unknown_symbols = keep_unknown_symbols
-        self.dataset_workers = dataset_workers
-        self.cipher_types = cipher_types
-        self.batch_size = batch_size
-        self.min_text_len = min_text_len
-        self.max_text_len = max_text_len
-        self.epoch = 0
-        self.iteration = 0
-        self.iter = None
-        datasets = []
-        for path in paths:
-            datasets.append(tf.data.TextLineDataset(path, num_parallel_reads=dataset_workers))
-        self.dataset = datasets[0]
-        for dataset in datasets[1:]:
-            self.dataset = self.dataset.zip(dataset)
-        count = 0
-        for cipher_t in self.cipher_types:
-            index = self.cipher_types.index(cipher_t)
-            if isinstance(config.KEY_LENGTHS[index], list):
-                count += len(config.KEY_LENGTHS[index])
-            else:
-                count += 1
-        self.key_lengths_count = count
-        self.generate_test_data = generate_test_data
-
-    def shuffle(self, buffer_size, seed=None, reshuffle_each_iteration=None):
-        new_dataset = copy.copy(self)
-        new_dataset.dataset = new_dataset.dataset.shuffle(buffer_size, seed, reshuffle_each_iteration)
-        return new_dataset
-
-    def __iter__(self):
-        self.iter = self.dataset.__iter__()
-        return self
-
-    def __next__(self):
-        processes = []
-        manager = multiprocessing.Manager()
-        c = SimpleSubstitution(config.INPUT_ALPHABET, config.UNKNOWN_SYMBOL, config.UNKNOWN_SYMBOL_NUMBER)
-        # debugging does not work here!
-        result_list = manager.list()
-        if self.generate_test_data:
-            ciphertext_list = manager.list()
-        for _ in range(self.dataset_workers):
-            d = []
-            for _ in range(self.batch_size // self.key_lengths_count):
-                try:
-                    # use the basic prefilter to get the most accurate text length
-                    data = c.filter(self.iter.__next__().numpy(), self.keep_unknown_symbols)
-                    while len(data) < self.min_text_len:
-                        # add the new data to the existing to speed up the searching process.
-                        data += c.filter(self.iter.__next__().numpy(), self.keep_unknown_symbols)
-                    if len(data) > self.max_text_len != -1:
-                        d.append(data[:self.max_text_len-(self.max_text_len % 2)])
-                    else:
-                        d.append(data[:len(data)-(len(data) % 2)])
-                except:
-                    self.epoch += 1
-                    self.__iter__()
-                    data = c.filter(self.iter.__next__().numpy(), self.keep_unknown_symbols)
-                    while len(data) < self.min_text_len:
-                        data += c.filter(self.iter.__next__().numpy(), self.keep_unknown_symbols)
-                    if len(data) > self.max_text_len:
-                        d.append(data[:self.max_text_len-(self.max_text_len % 2)])
-                    else:
-                        d.append(data[:len(data)-(len(data) % 2)])
-            if self.generate_test_data:
-                process = multiprocessing.Process(target=self._worker, args=(d, result_list, ciphertext_list))
-            else:
-                process = multiprocessing.Process(target=self._worker, args=(d, result_list))
-            process.start()
-            processes.append(process)
-        if self.generate_test_data:
-            return processes, result_list, ciphertext_list
-        return processes, result_list
-
-    def _worker(self, data, result, ciphertext_list=None):
-        batch = []
-        labels = []
-        ciphertexts = []
-        for d in data:
-            for cipher_t in self.cipher_types:
-                index = config.CIPHER_TYPES.index(cipher_t)
-                label = self.cipher_types.index(cipher_t)
-                if isinstance(config.KEY_LENGTHS[label], list):
-                    key_lengths = config.KEY_LENGTHS[label]
-                else:
-                    key_lengths = [config.KEY_LENGTHS[label]]
-                for key_length in key_lengths:
-                    ciphertext = encrypt(d, index, key_length, self.keep_unknown_symbols)
-                    if config.FEATURE_ENGINEERING:
-                        statistics = calculate_statistics(ciphertext)
-                        batch.append(statistics)
-                    else:
-                        batch.append(list(ciphertext))
-                    if self.generate_test_data:
-                        ciphertexts.append(list(ciphertext))
-                    labels.append(label)
-        if config.PAD_INPUT:
-            batch = pad_sequences(batch, maxlen=self.max_text_len)
-            batch = batch.reshape(batch.shape[0], batch.shape[1], 1)
-        if self.generate_test_data:
-            ciphertexts = pad_sequences(ciphertexts, maxlen=self.max_text_len)
-            ciphertext_list.append(ciphertexts)
-            result.append((batch, labels))
-        else:
-            result.append((tf.convert_to_tensor(batch), tf.convert_to_tensor(labels)))
