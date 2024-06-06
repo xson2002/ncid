@@ -120,7 +120,7 @@ python3 eval.py --help
 
 # Training
 
-By default we train the ACA ciphers listed [here](https://www.cryptogram.org/resource-area/cipher-types/). The plaintexts I used are already filtered and automatically downloaded in the train.py or eval.py scripts.  You can turn off this behavior by setting `--download_dataset=False`. 
+By default we train the models to identify ACA ciphers listed [here](https://www.cryptogram.org/resource-area/cipher-types/). The plaintexts used are already filtered and automatically downloaded in the train.py or eval.py scripts.  You can turn off this behavior by setting `--download_dataset=False`. 
 
 To see all options of `train.py`, run the `--help` or `-h` command.
 
@@ -198,7 +198,7 @@ Following are our training results from a DGX-1 with 2 GPUs on the models with l
 
 # Publications
 
-[Masterarbeit: Systematische Evaluierung von Architekturen und Features für die Bestimmung von klassischen Chiffren-Typen mit neuronalen Netzen](https://www.cryptool.org/assets/ctp/documents/MA_Leierzopf.pdf)
+[Masterarbeit: Systematische Evaluierung von Architekturen und Features für die Bestimmung von klassischen Chiffren-Typen mit neuronalen Netzen](https://www.cryptool.org/media/publications/theses/MA_Leierzopf.pdf)
 
 [Histocrypt 2021: A Massive Machine-Learning Approach For Classical Cipher Type Detection Using Feature Engineering](https://doi.org/10.3384/ecp183)
 
