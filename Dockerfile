@@ -1,5 +1,5 @@
 # base python image version
-ARG PYTHON_VERSION=3.8-slim-bookworm
+ARG PYTHON_VERSION=3.11-slim-bookworm
 
 
 # base image
