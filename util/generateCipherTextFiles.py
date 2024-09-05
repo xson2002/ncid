@@ -39,19 +39,19 @@ def encrypt_file_with_all_cipher_types(filename, save_folder, cipher_types_, app
     plaintexts = read_txt_list_from_file(filename)
     for cipher_type in cipher_types_:
         index = config.Cipher = config.CIPHER_TYPES.index(cipher_type)
+        key_exist = None
         if index > -1:
             print('Encrypting File: %s, Cipher: %s' % (filename, cipher_type))
             cipher = config.CIPHER_IMPLEMENTATIONS[index]
             key_length = config.KEY_LENGTHS[index][0]
             ciphertexts = []
             keys = []
-            
             filtered_plaintexts = [cipher.filter(line, keep_unknown_symbols) for line in plaintexts]
             converted_lines = convert_lines_to_length(filtered_plaintexts, min_text_len, max_text_len)
-
             for line in converted_lines:
                 try:
-                    ciphertext, key = encrypt(line, index, key_length, keep_unknown_symbols, True)
+                    ciphertext, key = encrypt(line, index, key_length, keep_unknown_symbols, True, key_exist)
+                    key_exist = key
                     ciphertexts.append(map_numbers_into_textspace(ciphertext, OUTPUT_ALPHABET, UNKNOWN_SYMBOL))
                     keys.append(key)
                 except Exception as e:
@@ -66,8 +66,10 @@ def encrypt_file_with_all_cipher_types(filename, save_folder, cipher_types_, app
                 #     print()
                 #     print("ciphertext: %s"%c)
                 #     print("error %d"%index)
-            path = os.path.join(save_folder, os.path.basename(filename).split('.txt')[0] + '-' + cipher_type + '-minLen' +
-                                str(min_text_len) + '-maxLen' + str(max_text_len) + '-keyLen' + str(key_length) + '.txt')
+            
+            #path = os.path.join(save_folder, os.path.basename(filename).split('.txt')[0] + '-' + cipher_type + '-minLen' +
+            #                    str(min_text_len) + '-maxLen' + str(max_text_len) + '-keyLen' + str(key_length) + '.txt')
+            path = os.path.join(save_folder, 'ciphertexts', os.path.basename(filename).split('.txt')[0] + '-' + cipher_type + '.txt')
             key_path = os.path.join(save_folder, 'keys', os.path.basename(filename).split('.txt')[0] + '-' + cipher_type + '.txt')
             if append_key:
                 write_ciphertexts_with_keys_to_file(path, ciphertexts, keys)
@@ -127,6 +129,16 @@ if __name__ == "__main__":
         cipher_types.append(config.CIPHER_TYPES[2])
         cipher_types.append(config.CIPHER_TYPES[3])
         cipher_types.append(config.CIPHER_TYPES[4])
+    # -------------------------------------------------------
+    if config.TEST in cipher_types:
+        del cipher_types[cipher_types.index(config.TEST)]
+        cipher_types.append(config.CIPHER_TYPES[2]) #Baconian
+        cipher_types.append(config.CIPHER_TYPES[55]) #Vigenere
+        cipher_types.append(config.CIPHER_TYPES[43]) #Rail Fence Cipher
+        cipher_types.append(config.CIPHER_TYPES[1]) #Autokey Cipher
+        cipher_types.append(config.CIPHER_TYPES[17]) #Gronsfeld
+    # -------------------------------------------------------
+
     if config.ACA in cipher_types:
         del cipher_types[cipher_types.index(config.ACA)]
         cipher_types.append(config.CIPHER_TYPES[0])
@@ -187,6 +199,7 @@ if __name__ == "__main__":
         cipher_types.append(config.CIPHER_TYPES[55])
     if not os.path.exists(args.save_folder) or not os.path.exists(args.save_folder+'/keys'):
         Path(args.save_folder).mkdir(parents=True, exist_ok=True)
+        Path(args.save_folder+'/ciphertexts').mkdir(parents=True, exist_ok=True)
         Path(args.save_folder+'/keys').mkdir(parents=True, exist_ok=True)
 
     # print all arguments for debugging..
@@ -210,3 +223,7 @@ if __name__ == "__main__":
             print_progress('Encrypting files: [', file_counter, total_file_count)
             if file_counter == total_file_count:
                 break
+
+"""
+python generateCipherTextFiles.py --min_text_len=1000 --max_text_len=1500 --max_files_count=1 --cipher=test
+"""
