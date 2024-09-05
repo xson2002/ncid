@@ -145,6 +145,7 @@ MTC3 = 'mtc3'
 ACA = 'aca'
 ROTOR = 'rotor'
 ALL = "all"
+TEST = 'test'
 FEATURE_ENGINEERING = True
 PAD_INPUT = False
 

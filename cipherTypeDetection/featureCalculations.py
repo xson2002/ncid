@@ -2,7 +2,7 @@ from cipherImplementations.cipher import OUTPUT_ALPHABET
 import cipherTypeDetection.config as config
 import math
 from collections import Counter
-from py_mini_racer import py_mini_racer
+#from py_mini_racer import py_mini_racer
 import numpy as np
 import time
 
@@ -754,8 +754,8 @@ function get_sstd(dat){
     s= do_swag_calc(dat);
     return(s);
 }"""
-ctx = py_mini_racer.MiniRacer()
-ctx.eval(js_functions)
+#ctx = py_mini_racer.MiniRacer()
+#ctx.eval(js_functions)
 
 
 global_english_frequencies = [
@@ -1096,14 +1096,14 @@ def calculate_ldi_stats(text):
     :return: a_ldi, b_ldi, p_ldi, s_ldi, v_ldi"""
     if np.count_nonzero(np.array(text) > 25) > 0:
         return [0, 0, 0, 0, 0]
-    return ctx.call("get_vig_values", text)
-
+    #return ctx.call("get_vig_values", text)
+    return 0
 
 def calculate_ptx(text):
     if np.count_nonzero(np.array(text) > 25) > 0:
         return 0
-    return ctx.call("calc_portax_logdi", text)
-
+    #return ctx.call("calc_portax_logdi", text)
+    return 0
 
 def calculate_phic(text):
     """calculates the Phillips IC.
@@ -1175,8 +1175,8 @@ def calculate_cdd(text):
     :return: cdd"""
     if np.count_nonzero(np.array(text) > 25) > 0:
         return 0
-    return ctx.call("get_cdd", text)
-
+    #return ctx.call("get_cdd", text)
+    return 0
 
 def calculate_sstd(text):
     """calculates Max STD Score for Swagman periods 4-8.
@@ -1184,7 +1184,8 @@ def calculate_sstd(text):
     :return: cdd"""
     if np.count_nonzero(np.array(text) > 25) > 0:
         return 0
-    return ctx.call("get_sstd", text)
+    #return ctx.call("get_sstd", text)
+    return 0
 
 def digrams():
     """Returns a list of all possible digrams for the numbers 0 to 25."""

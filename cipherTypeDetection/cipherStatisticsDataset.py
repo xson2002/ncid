@@ -17,7 +17,7 @@ from cipherTypeDetection.featureCalculations import calculate_statistics
 sys.path.append("../")
 
 
-def encrypt(plaintext, label, key_length, keep_unknown_symbols, return_key=False):
+def encrypt(plaintext, label, key_length, keep_unknown_symbols, return_key=False, key_exist = None):
     cipher = config.CIPHER_IMPLEMENTATIONS[label]
     plaintext = cipher.filter(plaintext, keep_unknown_symbols)
     if cipher.needs_plaintext_of_specific_length:
@@ -51,7 +51,9 @@ def encrypt(plaintext, label, key_length, keep_unknown_symbols, return_key=False
         for k in key:
             new_key_dict[cipher.alphabet.index(k)] = key[k]
         key = new_key_dict
-
+    # ------ only use one key -------
+    if not key_exist is None: 
+        orig_key = key = key_exist
     ciphertext = cipher.encrypt(plaintext_numberspace, key)
     if b'j' not in cipher.alphabet and config.CIPHER_TYPES[label] != 'homophonic':
         ciphertext = normalize_text(ciphertext, 9)
