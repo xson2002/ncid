@@ -123,9 +123,9 @@ Than I will give you the ciphertext and your task is identify which type of ciph
 
 The ciphertext : 
 <<<
-lrbdviosmmxpnrzntvbiqlrpmitujbxialmqevkvntmnfmahbbjdgqmwefxcwcrbwkhvbdfsgnzzdvcqtnnwljxrabjdgqmuojnz
+frvnatfnbqsgynunnqqwbeinzjxnubjdvcauojnzxoelwrpenpjnfrdjigbiytnrvreacamesrvjllamguxnlyhroiqsrqcriyrb
 >>>
-The Index of Coincidence of the ciphertext is 0.0391919191919192, the Chi-Square of the ciphertext is: 0.08137838756231545, the 1-Gram Frequency of the ciphertext is:
- a - 0.0300, b - 0.0800, c - 0.0300, d - 0.0500, e - 0.0200, f - 0.0300, g - 0.0300, h - 0.0200, i - 0.0400, j - 0.0500, k - 0.0200, l - 0.0400, m - 0.0800, n - 0.0800, o - 0.0200, p - 0.0200, q - 0.0500, r - 0.0500, s - 0.0200, t - 0.0400, u - 0.0200, v - 0.0600, w - 0.0400, x - 0.0400, y - 0.0000, z - 0.0400. 
+The Index of Coincidence of the ciphertext is 0.04525252525252525, the Chi-Square of the ciphertext is: 0.06315001321981845, the 1-Gram Frequency of the ciphertext is:
+ a - 0.0500, b - 0.0500, c - 0.0300, d - 0.0200, e - 0.0500, f - 0.0300, g - 0.0300, h - 0.0100, i - 0.0500, j - 0.0600, k - 0.0000, l - 0.0400, m - 0.0200, n - 0.1200, o - 0.0300, p - 0.0200, q - 0.0500, r - 0.1000, s - 0.0300, t - 0.0200, u - 0.0400, v - 0.0400, w - 0.0200, x - 0.0300, y - 0.0400, z - 0.0200. 
 
 Which type of cipher used to encrypt the text above and there are only 5 options: Baconian, Autokey, Gronsfeld, Vigenere, Railfence, Please provide a comprehensive response of at least 2000 words and focus on analyse the examples
