@@ -225,5 +225,5 @@ if __name__ == "__main__":
                 break
 
 """
-python generateCipherTextFiles.py --min_text_len=1000 --max_text_len=1500 --max_files_count=1 --cipher=test
+python generateCipherTextFiles.py --min_text_len=100 --max_text_len=100 --max_files_count=1 --cipher=test
 """
